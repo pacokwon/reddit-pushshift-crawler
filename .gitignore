@@ -1,0 +1,4 @@
+*.json
+*.csv
+__pycache__
+praw.ini
