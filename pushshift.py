@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 import csv
 import json
@@ -63,7 +64,7 @@ def cache_posts(keyword="dao", target_dir="./pushshift"):
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("----------- Finished Caching Posts -----------")
+    print("----------- Finished Caching Posts -----------", end="\n\n")
 
 def cache_comments(keyword="dao", target_dir="./pushshift"):
     cache_dir = f"{target_dir}/{comments_dir}/{keyword}"
@@ -114,7 +115,7 @@ def cache_comments(keyword="dao", target_dir="./pushshift"):
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("----------- Finished Caching Comments -----------")
+    print("----------- Finished Caching Comments -----------", end="\n\n")
 
 def resolve_post_content(post):
     # determine a post's main content. it might be just text, or a link
@@ -204,18 +205,33 @@ def process_comments(keyword="dao", target_dir="./pushshift"):
 
     print("Finished")
 
-def setup(keyword="dao", target_dir="./pushshift"):
+def cache(keyword="dao", target_dir="./pushshift"):
     cache_posts(keyword, target_dir)
     cache_comments(keyword, target_dir)
 
 
 # NOTE: might be helpful - https://www.reddit.com/comments/b8yd3r/.json
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        target_dir = sys.argv[1]
-    else:
-        target_dir = "./pushshift"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("keyword", help='Which keyword to search from pushshift. ex> "ethereum", "dao"')
+    parser.add_argument("--cache", help='Supported values: "none" | "post" | "comment" | "both" (without double quotes).', default="both")
+    parser.add_argument("--process", help='Supported values: "none" | "post" | "comment" | "both" (without double quotes)', default="both")
 
-    setup()
-    process_posts()
-    # process_comments(target_dir)
+    args = parser.parse_args()
+    keyword = args.keyword
+
+    if args.cache == "both":
+        cache_posts(keyword)
+        cache_comments(keyword)
+    elif args.cache == "post":
+        cache_posts(keyword)
+    elif args.cache == "comment":
+        cache_comments(keyword)
+
+    if args.process == "both":
+        process_posts(keyword)
+        process_comments(keyword)
+    elif args.process == "post":
+        process_posts(keyword)
+    elif args.process == "comment":
+        process_comments(keyword)
