@@ -11,21 +11,23 @@ import sys
 
 # https://www.datacamp.com/tutorial/scraping-reddit-python-scrapy
 
-posts_dir = "./posts"
-comments_dir = "./comments"
+posts_dir = "posts"
+comments_dir = "comments"
 
-def cache_posts():
-    if os.path.exists(posts_dir):
+def cache_posts(keyword="dao", target_dir="./pushshift"):
+    cache_dir = f"{target_dir}/{posts_dir}/{keyword}"
+
+    if os.path.exists(cache_dir):
         return
 
-    os.mkdir(posts_dir)
+    os.makedirs(cache_dir)
     start_time = int(datetime.strptime('2016-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S').timestamp())
     end_time = int(datetime.strptime('2018-12-31T23:59:59', '%Y-%m-%dT%H:%M:%S').timestamp())
     page_size = 250
 
     url = "https://api.pushshift.io/reddit/search/submission"
     params = {
-        "q": "dao",
+        "q": keyword,
         "after": start_time,
         "before": end_time,
         "subreddit": "ethereum",
@@ -39,11 +41,12 @@ def cache_posts():
     response_json = initial_response.json()
     total_results = response_json["metadata"]["total_results"]
     pages = math.ceil(total_results / page_size)
-    with open(f"{posts_dir}/post1.json", "w") as f:
+    with open(f"{cache_dir}/post1.json", "w") as f:
         f.write(initial_response.text)
+    print("----------- Started Caching Posts  -----------")
 
-    print(f"Total Results: {total_results}")
-    print(f"Total Pages: {pages}")
+    print(f"Total Results: {total_results} posts")
+    print(f"Total Pages: {pages} pages")
 
     last_time = response_json["data"][-1]["created_utc"]
     # we've already fetched page 1
@@ -54,26 +57,28 @@ def cache_posts():
         }
         response = requests.get(url, params=params)
         response_json = response.json()
-        with open(f"{posts_dir}/post{i + 1}.json", "w") as f:
+        with open(f"{cache_dir}/post{i + 1}.json", "w") as f:
             f.write(response.text)
         last_time = response_json["data"][-1]["created_utc"]
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("Finished Caching Posts.")
+    print("----------- Finished Caching Posts -----------")
 
-def cache_comments():
-    if os.path.exists(comments_dir):
+def cache_comments(keyword="dao", target_dir="./pushshift"):
+    cache_dir = f"{target_dir}/{comments_dir}/{keyword}"
+
+    if os.path.exists(cache_dir):
         return
 
-    os.mkdir(comments_dir)
+    os.makedirs(cache_dir)
     start_time = int(datetime.strptime('2016-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S').timestamp())
     end_time = int(datetime.strptime('2018-12-31T23:59:59', '%Y-%m-%dT%H:%M:%S').timestamp())
     page_size = 250
 
     url = "https://api.pushshift.io/reddit/search/comment"
     params = {
-        "q": "dao",
+        "q": keyword,
         "after": start_time,
         "before": end_time,
         "subreddit": "ethereum",
@@ -87,11 +92,12 @@ def cache_comments():
     response_json = initial_response.json()
     total_results = response_json["metadata"]["total_results"]
     pages = math.ceil(total_results / page_size)
-    with open(f"{comments_dir}/comment1.json", "w") as f:
+    with open(f"{cache_dir}/comment1.json", "w") as f:
         f.write(initial_response.text)
+    print("----------- Started Caching Comments  -----------")
 
-    print(f"Total Results: {total_results}")
-    print(f"Total Pages: {pages}")
+    print(f"Total Results: {total_results} comments")
+    print(f"Total Pages: {pages} pages")
 
     last_time = response_json["data"][-1]["created_utc"]
     # we've already fetched page 1
@@ -102,17 +108,13 @@ def cache_comments():
         }
         response = requests.get(url, params=params)
         response_json = response.json()
-        with open(f"{comments_dir}/comment{i + 1}.json", "w") as f:
+        with open(f"{cache_dir}/comment{i + 1}.json", "w") as f:
             f.write(response.text)
         last_time = response_json["data"][-1]["created_utc"]
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("Finished Caching Comments.")
-
-def setup():
-    cache_posts()
-    cache_comments()
+    print("----------- Finished Caching Comments -----------")
 
 def resolve_post_content(post):
     # determine a post's main content. it might be just text, or a link
@@ -128,7 +130,12 @@ def resolve_post_content(post):
 
     return post["url"]
 
-def process_posts(target_dir):
+def process_posts(keyword="dao", target_dir="./pushshift"):
+    cache_dir = f"{target_dir}/{posts_dir}/{keyword}"
+
+    if not os.path.exists(cache_dir):
+        print(f"Error: Cache directory {cache_dir} for keyword {keyword} not found.", file=sys.stderr)
+
     fieldnames = ["num_post", "title", "author", "date", "contents", "comments", "votes", "link"]
     with open(f"{target_dir}/posts.csv", "w", newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
@@ -136,8 +143,8 @@ def process_posts(target_dir):
 
         post_no = 1
         index = 1
-        while os.path.exists(f"{posts_dir}/post{post_no}.json"):
-            with open(f"{posts_dir}/post{post_no}.json") as f:
+        while os.path.exists(f"{cache_dir}/post{post_no}.json"):
+            with open(f"{cache_dir}/post{post_no}.json") as f:
                 data = json.loads(f.read())
 
             for post in data["data"]:
@@ -158,16 +165,21 @@ def process_posts(target_dir):
 
     print("Finished")
 
-def process_comments(target_dir):
+def process_comments(keyword="dao", target_dir="./pushshift"):
+    cache_dir = f"{target_dir}/{comments_dir}"
+
+    if not os.path.exists(cache_dir):
+        print(f"Error: Cache directory {cache_dir} for keyword {keyword} not found.", file=sys.stderr)
+
     fieldnames = ["num_comment", "author", "date", "contents", "votes", "post_link", "comment_link", "reply_to"]
-    with open(f"{target_dir}/comments.csv", "w", newline='') as csvfile:
+    with open(f"{cache_dir}/comments.csv", "w", newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
         comment_no = 1
         index = 1
-        while os.path.exists(f"{comments_dir}/comment{comment_no}.json"):
-            with open(f"{comments_dir}/comment{comment_no}.json") as f:
+        while os.path.exists(f"{cache_dir}/comment{comment_no}.json"):
+            with open(f"{cache_dir}/comment{comment_no}.json") as f:
                 data = json.loads(f.read())
 
             for comment in data["data"]:
@@ -192,13 +204,18 @@ def process_comments(target_dir):
 
     print("Finished")
 
+def setup(keyword="dao", target_dir="./pushshift"):
+    cache_posts(keyword, target_dir)
+    cache_comments(keyword, target_dir)
+
+
 # NOTE: might be helpful - https://www.reddit.com/comments/b8yd3r/.json
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         target_dir = sys.argv[1]
     else:
-        target_dir = '.'
+        target_dir = "./pushshift"
 
     setup()
-    process_posts(target_dir)
+    process_posts()
     # process_comments(target_dir)
