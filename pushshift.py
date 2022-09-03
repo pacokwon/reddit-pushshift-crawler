@@ -15,23 +15,23 @@ import sys
 posts_dir = "posts"
 comments_dir = "comments"
 
-def cache_posts(keyword="dao", target_dir="./pushshift"):
+def cache_posts(keyword, after, before, subreddit, target_dir="./cache/pushshift"):
     cache_dir = f"{target_dir}/{posts_dir}/{keyword}"
 
     if os.path.exists(cache_dir):
         return
 
     os.makedirs(cache_dir)
-    start_time = int(datetime.strptime('2016-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S').timestamp())
-    end_time = int(datetime.strptime('2018-12-31T23:59:59', '%Y-%m-%dT%H:%M:%S').timestamp())
+    start_time = int(datetime.strptime(after, '%Y-%m-%dT%H:%M:%S').timestamp())
+    end_time = int(datetime.strptime(before, '%Y-%m-%dT%H:%M:%S').timestamp())
     page_size = 250
 
     url = "https://api.pushshift.io/reddit/search/submission"
     params = {
-        "q": keyword,
+        "q": "" if keyword == "all" else keyword,
         "after": start_time,
         "before": end_time,
-        "subreddit": "ethereum",
+        "subreddit": subreddit,
         "sort": "asc",
         "sort_type": "created_utc",
         "size": page_size,
@@ -64,17 +64,18 @@ def cache_posts(keyword="dao", target_dir="./pushshift"):
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("----------- Finished Caching Posts -----------", end="\n\n")
+    print("----------- Finished Caching Posts -----------")
+    print(f"Cache directory is {cache_dir}", end="\n\n")
 
-def cache_comments(keyword="dao", target_dir="./pushshift"):
+def cache_comments(keyword, after, before, subreddit, target_dir="./cache/pushshift"):
     cache_dir = f"{target_dir}/{comments_dir}/{keyword}"
 
     if os.path.exists(cache_dir):
         return
 
     os.makedirs(cache_dir)
-    start_time = int(datetime.strptime('2016-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S').timestamp())
-    end_time = int(datetime.strptime('2018-12-31T23:59:59', '%Y-%m-%dT%H:%M:%S').timestamp())
+    start_time = int(datetime.strptime(after, '%Y-%m-%dT%H:%M:%S').timestamp())
+    end_time = int(datetime.strptime(before, '%Y-%m-%dT%H:%M:%S').timestamp())
     page_size = 250
 
     url = "https://api.pushshift.io/reddit/search/comment"
@@ -82,7 +83,7 @@ def cache_comments(keyword="dao", target_dir="./pushshift"):
         "q": keyword,
         "after": start_time,
         "before": end_time,
-        "subreddit": "ethereum",
+        "subreddit": subreddit,
         "sort": "asc",
         "sort_type": "created_utc",
         "size": page_size,
@@ -115,7 +116,8 @@ def cache_comments(keyword="dao", target_dir="./pushshift"):
 
         print(f"{(i + 1):5} / {pages} Fetched.", end="\r")
 
-    print("----------- Finished Caching Comments -----------", end="\n\n")
+    print("----------- Finished Caching Comments -----------")
+    print(f"Cache directory is {cache_dir}", end="\n\n")
 
 def resolve_post_content(post):
     # determine a post's main content. it might be just text, or a link
@@ -131,14 +133,17 @@ def resolve_post_content(post):
 
     return post["url"]
 
-def process_posts(keyword="dao", target_dir="./pushshift"):
+def process_posts(keyword="dao", target_dir="./cache/pushshift", output_dir="./results"):
     cache_dir = f"{target_dir}/{posts_dir}/{keyword}"
 
     if not os.path.exists(cache_dir):
         print(f"Error: Cache directory {cache_dir} for keyword {keyword} not found.", file=sys.stderr)
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     fieldnames = ["num_post", "title", "author", "date", "contents", "comments", "votes", "link"]
-    with open(f"{target_dir}/posts.csv", "w", newline='') as csvfile:
+    with open(f"{output_dir}/{keyword}-posts.csv", "w", newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
@@ -164,16 +169,16 @@ def process_posts(keyword="dao", target_dir="./pushshift"):
 
             post_no += 1
 
-    print("Finished")
+    print(f"Finished processing posts. Results are at {output_dir}/{keyword}-posts.csv")
 
-def process_comments(keyword="dao", target_dir="./pushshift"):
+def process_comments(keyword, target_dir="./cache/pushshift", output_dir="./results"):
     cache_dir = f"{target_dir}/{comments_dir}"
 
     if not os.path.exists(cache_dir):
         print(f"Error: Cache directory {cache_dir} for keyword {keyword} not found.", file=sys.stderr)
 
     fieldnames = ["num_comment", "author", "date", "contents", "votes", "post_link", "comment_link", "reply_to"]
-    with open(f"{cache_dir}/comments.csv", "w", newline='') as csvfile:
+    with open(f"{output_dir}/{keyword}-comments.csv", "w", newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
@@ -203,30 +208,42 @@ def process_comments(keyword="dao", target_dir="./pushshift"):
 
             comment_no += 1
 
-    print("Finished")
+    print(f"Finished processing comments. Results are at {output_dir}/{keyword}-comments.csv")
 
-def cache(keyword="dao", target_dir="./pushshift"):
-    cache_posts(keyword, target_dir)
-    cache_comments(keyword, target_dir)
-
-
-# NOTE: might be helpful - https://www.reddit.com/comments/b8yd3r/.json
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("keyword", help='Which keyword to search from pushshift. ex> "ethereum", "dao"')
+    parser.add_argument("keyword", help='Which keyword to search from pushshift. Pass "all" to search all posts. ex> "ethereum", "dao"')
     parser.add_argument("--cache", help='Supported values: "none" | "post" | "comment" | "both" (without double quotes).', default="both")
-    parser.add_argument("--process", help='Supported values: "none" | "post" | "comment" | "both" (without double quotes)', default="both")
+    parser.add_argument("--process", help='Supported values: "none" | "post" | "comment" | "both" (without double quotes)', default="none")
+    parser.add_argument(
+        "--after",
+        help='Posts or comments posted after this date will be collected. format> 2016-01-01',
+        type=lambda s: f'{s}T00:00:00'
+    )
+    parser.add_argument(
+        "--before",
+        help='Posts or comments posted before this date will be collected format> 2018-12-31',
+        type=lambda s: f'{s}T23:59:59'
+    )
+    parser.add_argument("--subreddit", help='Which subreddit to search posts or comments from. ex> "ethereum"', default="ethereum")
 
     args = parser.parse_args()
     keyword = args.keyword
 
+    subreddit = args.subreddit
+    if args.cache != "none":
+        if args.after is None:
+            print("The --after option must be specified for --cache", file=sys.stderr)
+        if args.before is None:
+            print("The --before option must be specified for --cache", file=sys.stderr)
+
     if args.cache == "both":
-        cache_posts(keyword)
-        cache_comments(keyword)
+        cache_posts(keyword, args.after, args.before, subreddit)
+        cache_comments(keyword, args.after, args.before, subreddit)
     elif args.cache == "post":
-        cache_posts(keyword)
+        cache_posts(keyword, args.after, args.before, subreddit)
     elif args.cache == "comment":
-        cache_comments(keyword)
+        cache_comments(keyword, args.after, args.before, subreddit)
 
     if args.process == "both":
         process_posts(keyword)
