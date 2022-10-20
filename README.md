@@ -30,7 +30,7 @@ client_secret=12l149x8cVaLsdfjk
 ### Collecting post data from pushshift
 Example:
 ```bash
-python3 pushshift.py --cache --after 2016-01-01 --before 2018-12-31 --subreddit ethereum dao
+python3 pushshift.py --cache both --after 2016-01-01 --before 2018-12-31 --subreddit ethereum dao
 # Running this command will collect posts containing the keyword "dao" from ethereum between the time period 2016-01-01 to 2018-12-31
 # Check ./cache/pushshift/posts/<keyword> after running this command!
 ```
